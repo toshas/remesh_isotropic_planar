@@ -43,7 +43,7 @@ The code accepts and produces files in the Object File Format (`*.off`) file for
 Test the code as follows:
 
 ```shell
-./build/remesh_isotropic_planar data/jacuzzi.off data/jacuzzi_128.off --resolution 128 
+./build/remesh_isotropic_planar data/jacuzzi.off out.off --resolution 128 
 ```
 
 Resolution defines the length of the output model's edges relative to the whole model's diameter.
