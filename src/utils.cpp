@@ -6,6 +6,7 @@
 #include <CGAL/Polygon_mesh_processing/IO/polygon_mesh_io.h>
 #include <CGAL/Polygon_mesh_processing/polygon_soup_to_polygon_mesh.h>
 #include <CGAL/Polygon_mesh_processing/polygon_mesh_to_polygon_soup.h>
+#include <CGAL/Polygon_mesh_processing/orient_polygon_soup_extension.h>
 #include <CGAL/Bbox_3.h>
 #include <CGAL/bounding_box.h>
 #include <CGAL/Point_set_3.h>
@@ -116,6 +117,7 @@ void merge_close_vertices(
 void clean_up_polygon_soup(
         std::vector<Point_3> &points,
         std::vector<std::vector<std::size_t>> &polygons,
+        const Surface_mesh *reference,
         double tolerance,
         bool verbose
 ) {
@@ -141,7 +143,12 @@ void clean_up_polygon_soup(
     }
 
     PMP::repair_polygon_soup(points, polygons);
-    PMP::orient_polygon_soup(points, polygons);
+    if (reference == nullptr) {
+        PMP::orient_polygon_soup(points, polygons);
+    } else {
+        PMP::orient_triangle_soup_with_reference_triangle_mesh(*reference, points, polygons);
+        PMP::duplicate_non_manifold_edges_in_polygon_soup(points, polygons);
+    }
 
     if (verbose) {
         num_points_after = points.size();
@@ -167,7 +174,7 @@ void read_and_repair_polygon_soup(
         exit(0);
     }
 
-    clean_up_polygon_soup(points, polygons, 0.0, verbose);
+    clean_up_polygon_soup(points, polygons, nullptr, 0.0, verbose);
 }
 
 
@@ -182,12 +189,12 @@ Surface_mesh read_and_repair_input_or_exit(const std::string &path_in, bool verb
 }
 
 
-Surface_mesh clean_up_mesh(const Surface_mesh &mesh, double tolerance, bool verbose) {
+Surface_mesh clean_up_mesh(const Surface_mesh &mesh, const Surface_mesh *reference, double tolerance, bool verbose) {
     std::vector<Point_3> points;
     std::vector<std::vector<std::size_t>> polygons;
     PMP::polygon_mesh_to_polygon_soup(mesh, points, polygons);
 
-    clean_up_polygon_soup(points, polygons, tolerance, verbose);
+    clean_up_polygon_soup(points, polygons, reference, tolerance, verbose);
 
     Surface_mesh mesh_out;
     PMP::polygon_soup_to_polygon_mesh(points, polygons, mesh_out);

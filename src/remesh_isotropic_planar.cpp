@@ -616,7 +616,7 @@ Surface_mesh remesh_isotropic_planar(
     if (verbose) {
         std::cout << "Cleaning up the final mesh..." << std::endl;
     }
-    mesh_out = clean_up_mesh(mesh_out, tolerance, verbose);
+    mesh_out = clean_up_mesh(mesh_out, &mesh, tolerance, verbose);
 
     return mesh_out;
 }

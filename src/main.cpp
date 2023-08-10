@@ -6,10 +6,12 @@
 #include <CGAL/Polygon_mesh_processing/IO/polygon_mesh_io.h>
 #include <boost/program_options.hpp>
 #include <string>
+#include <filesystem>
 
 #include "remesh_isotropic_planar/utils.h"
 #include "remesh_isotropic_planar/remesh_isotropic_planar.h"
 
+namespace fs = std::filesystem;
 namespace PO = boost::program_options;
 namespace PMP = CGAL::Polygon_mesh_processing;
 
@@ -88,6 +90,8 @@ int main(int argc, const char *argv[]) {
     if (verbose) {
         std::cout << "Storing to " << path_out << "..." << std::endl;
     }
+    fs::path path_dirs = fs::path(path_out).parent_path();
+    fs::create_directories(path_dirs);
     CGAL::IO::write_polygon_mesh(path_out, mesh_out);
 
     if (verbose) {

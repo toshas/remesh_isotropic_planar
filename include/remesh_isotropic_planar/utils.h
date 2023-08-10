@@ -11,4 +11,4 @@
 void tqdm(int counter, int total);
 double aabb_extent(const Surface_mesh &mesh);
 Surface_mesh read_and_repair_input_or_exit(const std::string &path_in, bool verbose=false);
-Surface_mesh clean_up_mesh(const Surface_mesh &mesh, double tolerance, bool verbose=false);
+Surface_mesh clean_up_mesh(const Surface_mesh &mesh, const Surface_mesh *reference, double tolerance, bool verbose=false);
