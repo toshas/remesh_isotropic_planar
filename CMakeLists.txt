@@ -24,3 +24,5 @@ target_link_libraries(remesh_isotropic_planar PRIVATE
     ${CGAL_LIBRARIES}
     Boost::program_options
 )
+
+install(TARGETS remesh_isotropic_planar RUNTIME DESTINATION bin)
