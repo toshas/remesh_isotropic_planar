@@ -38,17 +38,12 @@ namespace PMP = CGAL::Polygon_mesh_processing;
 void detect_planar_regions(
         const Surface_mesh &mesh,
         std::vector<std::size_t> &region_ids,
-        std::vector<std::size_t> &corner_ids,
-        std::vector<bool> &edge_boundary,
         boost::vector_property_map<CGAL::Epick::Vector_3> &region_normals,
         std::vector<Point_3> &region_offsets,
         std::size_t &nb_regions,
-        std::size_t &nb_corners,
         double tolerance = 1e-5
 ) {
     region_ids.resize(num_faces(mesh), -1);
-    corner_ids.resize(num_vertices(mesh), -1);
-    edge_boundary.resize(num_edges(mesh), false);
 
     // detect planar regions in the mesh
     nb_regions = PMP::region_growing_of_planes_on_faces(
@@ -79,18 +74,6 @@ void detect_planar_regions(
         double denom = face_counts[region_id];
         region_offsets[region_id] = Point_3(p.x() / denom, p.y() / denom, p.z() / denom);
     }
-
-    // detect corner vertices on the boundary of planar regions
-    nb_corners = PMP::detect_corners_of_regions(
-            mesh,
-            CGAL::make_random_access_property_map(region_ids),
-            nb_regions,
-            CGAL::make_random_access_property_map(corner_ids),
-            CGAL::parameters::
-                    cosine_of_maximum_angle(1 - tolerance).
-                    maximum_distance(tolerance).
-                    edge_is_constrained_map(CGAL::make_random_access_property_map(edge_boundary))
-    );
 }
 
 
@@ -563,11 +546,9 @@ Surface_mesh remesh_isotropic_planar(
         bool verbose
 ) {
     std::vector<std::size_t> region_ids;
-    std::vector<std::size_t> corner_ids;
-    std::vector<bool> edge_boundary;
     boost::vector_property_map<CGAL::Epick::Vector_3> region_normals;
     std::vector<Point_3> region_offsets;
-    size_t nb_regions, nb_corners;
+    size_t nb_regions;
 
     if (verbose) {
         std::cout << "Extracting planar regions..." << std::endl;
@@ -575,12 +556,9 @@ Surface_mesh remesh_isotropic_planar(
     detect_planar_regions(
             mesh,
             region_ids,
-            corner_ids,
-            edge_boundary,
             region_normals,
             region_offsets,
-            nb_regions,
-            nb_corners
+            nb_regions
     );
 
     Surface_mesh mesh_out;
