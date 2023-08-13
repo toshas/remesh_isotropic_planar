@@ -30,7 +30,7 @@ typedef boost::graph_traits<Surface_mesh>::halfedge_descriptor halfedge_descript
 typedef CGAL::Delaunay_mesh_vertex_base_2<K_EPICK> Vb;
 typedef CGAL::Delaunay_mesh_face_base_2<K_EPICK> Fb;
 typedef CGAL::Triangulation_data_structure_2<Vb, Fb> Tds;
-typedef CGAL::Constrained_Delaunay_triangulation_2<K_EPICK, Tds> CDT;
+typedef CGAL::Constrained_Delaunay_triangulation_2<K_EPICK, Tds, CGAL::Exact_predicates_tag> CDT;
 
 namespace PMP = CGAL::Polygon_mesh_processing;
 
@@ -52,7 +52,8 @@ void detect_planar_regions(
             CGAL::parameters::
                     cosine_of_maximum_angle(1 - tolerance).
                     region_primitive_map(region_normals).
-                    maximum_distance(tolerance)
+                    maximum_distance(tolerance).
+                    postprocess_regions(true)
     );
 
     // Compute the centroid for each face and add it to the region's centroid
