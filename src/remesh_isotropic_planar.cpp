@@ -3,6 +3,7 @@
 // This file is part of the Planar Isotropic Remesher project.
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <CGAL/exceptions.h>
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Surface_mesh.h>
 #include <CGAL/Polygon_mesh_processing/border.h>
@@ -486,9 +487,13 @@ void process_one_region(
         Surface_mesh &region_mesh_triangulated,
         size_t region_id,
         double max_edge_len,
-        bool verbose=false,
-        bool dump_intermediates=false
+        bool dump_intermediates=false,
+        bool debug=false
 ) {
+    if (debug) {
+        dump_intermediates = true;
+    }
+
     std::string path_base;
     if (dump_intermediates) {
         std::ostringstream oss;
@@ -534,6 +539,10 @@ void process_one_region(
         dump_boundaries_2d(region_mesh_boundaries_2d, path_base + ".2.boundaries.svg");
     }
 
+    if (debug) {
+        return;
+    }
+
     triangulate_region(
             region_mesh_boundaries_2d,
             region_mesh_mat_to_3d,
@@ -575,6 +584,7 @@ Surface_mesh remesh_isotropic_planar(
     );
 
     Surface_mesh mesh_out;
+    int failed_regions = 0;
 
     if (verbose) {
         std::cout << "Remeshing " << nb_regions << " regions..." << std::endl;
@@ -585,31 +595,48 @@ Surface_mesh remesh_isotropic_planar(
         }
 
         Surface_mesh region_mesh_triangulated;
-        process_one_region(
-                mesh, region_ids,
-                region_normals,
-                region_offsets,
-                region_mesh_triangulated,
-                /*region_id=*/ r,
-                max_edge_len,
-                verbose,
-                dump_intermediates
-        );
+        auto process_fn = [&] (bool debug) {
+            process_one_region(
+                    mesh,
+                    region_ids,
+                    region_normals,
+                    region_offsets,
+                    region_mesh_triangulated,
+                    /*region_id=*/ r,
+                    max_edge_len,
+                    dump_intermediates,
+                    debug
+            );
+        };
 
-        std::map<Surface_mesh::Vertex_index, Surface_mesh::Vertex_index> vertex_map;
+        try {
+            process_fn(false);
 
-        for (auto v : region_mesh_triangulated.vertices()) {
-            vertex_map[v] = mesh_out.add_vertex(region_mesh_triangulated.point(v));
-        }
+            std::map<Surface_mesh::Vertex_index, Surface_mesh::Vertex_index> vertex_map;
 
-        for (auto f : region_mesh_triangulated.faces()) {
-            auto hc = region_mesh_triangulated.halfedge(f);
-            std::vector<Surface_mesh::Vertex_index> face_vertices;
-            for (int i = 0; i < 3; i++) {
-                face_vertices.push_back(vertex_map[region_mesh_triangulated.target(hc)]);
-                hc = region_mesh_triangulated.next(hc);
+            for (auto v : region_mesh_triangulated.vertices()) {
+                vertex_map[v] = mesh_out.add_vertex(region_mesh_triangulated.point(v));
             }
-            mesh_out.add_face(face_vertices[0], face_vertices[1], face_vertices[2]);
+
+            for (auto f : region_mesh_triangulated.faces()) {
+                auto hc = region_mesh_triangulated.halfedge(f);
+                std::vector<Surface_mesh::Vertex_index> face_vertices;
+                for (int i = 0; i < 3; i++) {
+                    face_vertices.push_back(vertex_map[region_mesh_triangulated.target(hc)]);
+                    hc = region_mesh_triangulated.next(hc);
+                }
+                if (face_vertices.size() == 3) {
+                    mesh_out.add_face(face_vertices[0], face_vertices[1], face_vertices[2]);
+                }
+            }
+        } catch (const CDT::Intersection_of_constraints_exception &e) {
+            std::cerr << "Region " << r << " could not be remeshed" << std::endl;
+            failed_regions++;
+#ifndef NDEBUG
+            if (!dump_intermediates) {
+                process_fn(true);
+            }
+#endif
         }
     }
 
@@ -617,6 +644,10 @@ Surface_mesh remesh_isotropic_planar(
         std::cout << "Cleaning up the final mesh..." << std::endl;
     }
     mesh_out = clean_up_mesh(mesh_out, &mesh, tolerance, verbose);
+
+    if (failed_regions > 0) {
+        std::cerr << "Output mesh is missing " << failed_regions << " surfaces" << std::endl;
+    }
 
     return mesh_out;
 }

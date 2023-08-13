@@ -37,6 +37,23 @@ void tqdm(int counter, int total) {
 }
 
 
+void check_soup(const std::vector<Point_3> &points, const std::vector<std::vector<std::size_t>> &polygons) {
+    std::size_t num_pt = points.size();
+    for (const auto &poly : polygons) {
+        if (poly.size() != 3) {
+            throw std::runtime_error("Not a triangle");
+        }
+        for (std::size_t idx : poly) {
+            if (idx == (std::size_t)(-1)) {
+                throw std::runtime_error("Bad index (-1)");
+            } else if (idx >= num_pt) {
+                throw std::runtime_error(std::string("Bad index greater than ") + std::to_string(num_pt));
+            }
+        }
+    }
+}
+
+
 void merge_close_vertices(
         std::vector<Point_3> &points,
         std::vector<std::vector<std::size_t>> &polygons,
@@ -72,45 +89,61 @@ void merge_close_vertices(
     std::vector<Point_3> cluster_aabb_max(nb_clusters, Point_3(-INFINITY, -INFINITY, -INFINITY));
     std::vector<Point_3> cluster_centroids(nb_clusters, Point_3(0, 0, 0));
     std::vector<int> cluster_sizes(nb_clusters, 0);
+    std::map<int, std::set<std::size_t>> map_cluster_to_idx_old;
     for (const Point_set::Index &idx : point_set) {
         int cluster_id = cluster_map[idx];
+        if (cluster_id == -1) {
+            throw std::runtime_error("Found a point without a cluster assigned");
+        }
+
+        map_cluster_to_idx_old[cluster_id].insert(idx);
+        cluster_sizes[cluster_id]++;
+
         const Point_3 &p = point_set.point(idx);
         cluster_aabb_min[cluster_id] = CGAL::min(cluster_aabb_min[cluster_id], p);
         cluster_aabb_max[cluster_id] = CGAL::max(cluster_aabb_max[cluster_id], p);
         cluster_centroids[cluster_id] = cluster_centroids[cluster_id] + (p - CGAL::ORIGIN);
-        cluster_sizes[cluster_id]++;
     }
 
     std::vector<Point_3> points_new;
-    std::vector<std::vector<std::size_t>> polygons_new;
-
-    std::vector<size_t> map_cluster_to_new_idx(nb_clusters, SIZE_MAX);
-    std::vector<bool> cluster_collapsible(nb_clusters, false);
+    std::vector<size_t> map_vertex_idx_old_to_idx_new(points.size(), SIZE_MAX);
     for (std::size_t i = 0; i < nb_clusters; i++) {
-        cluster_centroids[i] = CGAL::ORIGIN + (cluster_centroids[i] - CGAL::ORIGIN) / cluster_sizes[i];
-        auto sz = cluster_aabb_max[i] - cluster_aabb_min[i];
-        if (cluster_sizes[i] >= 1 && sz.x() < tolerance && sz.y() < tolerance && sz.z() < tolerance) {
-            cluster_collapsible[i] = true;
-            map_cluster_to_new_idx[i] = points_new.size();
-            points_new.push_back(cluster_centroids[i]);
-        }
         if (cluster_sizes[i] == 0) {
             throw std::runtime_error("Empty cluster");
         }
+        auto sz = cluster_aabb_max[i] - cluster_aabb_min[i];
+        auto all_cluster_idx_old = map_cluster_to_idx_old[int(i)];
+        if (cluster_sizes[i] >= 1 && sz.x() < tolerance && sz.y() < tolerance && sz.z() < tolerance) {
+            size_t idx_new = points_new.size();
+            auto centroid = CGAL::ORIGIN + (cluster_centroids[i] - CGAL::ORIGIN) / cluster_sizes[i];
+            points_new.push_back(centroid);
+            for (const auto &idx_old : all_cluster_idx_old) {
+                map_vertex_idx_old_to_idx_new[idx_old] = idx_new;
+            }
+        } else {
+            for (const auto &idx_old : all_cluster_idx_old) {
+                size_t idx_new = points_new.size();
+                const Point_3 &p = point_set.point(idx_old);
+                points_new.push_back(p);
+                map_vertex_idx_old_to_idx_new[idx_old] = idx_new;
+            }
+        }
     }
 
+    std::vector<std::vector<std::size_t>> polygons_new;
     for (const auto &polygon : polygons) {
-        std::vector<std::size_t> poly_new;
-        for (std::size_t idx_old : polygon) {
-            int cluster_id = cluster_map[idx_old];
-            size_t idx_new = map_cluster_to_new_idx[cluster_id];
-            poly_new.push_back(idx_new);
+        std::vector<std::size_t> poly_new(polygon.size(), SIZE_MAX);
+        std::size_t i = 0;
+        for (const auto &idx_old : polygon) {
+            poly_new[i++] = map_vertex_idx_old_to_idx_new[idx_old];
         }
         polygons_new.push_back(poly_new);
     }
 
     points = std::move(points_new);
     polygons = std::move(polygons_new);
+
+    check_soup(points, polygons);
 }
 
 
