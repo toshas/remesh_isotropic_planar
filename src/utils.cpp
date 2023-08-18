@@ -7,6 +7,7 @@
 #include <CGAL/Polygon_mesh_processing/polygon_soup_to_polygon_mesh.h>
 #include <CGAL/Polygon_mesh_processing/polygon_mesh_to_polygon_soup.h>
 #include <CGAL/Polygon_mesh_processing/orient_polygon_soup_extension.h>
+#include <CGAL/Polygon_mesh_processing/repair.h>
 #include <CGAL/Bbox_3.h>
 #include <CGAL/bounding_box.h>
 #include <CGAL/Point_set_3.h>
@@ -132,11 +133,26 @@ void merge_close_vertices(
 
     std::vector<std::vector<std::size_t>> polygons_new;
     for (const auto &polygon : polygons) {
+        if (polygon.size() != 3) {
+            throw std::runtime_error("Not a triangle");
+        }
+
         std::vector<std::size_t> poly_new(polygon.size(), SIZE_MAX);
+        std::vector<Point_3> verts(3);
+
         std::size_t i = 0;
         for (const auto &idx_old : polygon) {
-            poly_new[i++] = map_vertex_idx_old_to_idx_new[idx_old];
+            const auto &idx_new = map_vertex_idx_old_to_idx_new[idx_old];
+            verts[i] = points_new[idx_new];
+            poly_new[i] = idx_new;
+            i++;
         }
+
+        K_EPICK::Triangle_3 triangle(verts[0], verts[1], verts[2]);
+        if (triangle.squared_area() == 0.0) {
+            continue;
+        }
+
         polygons_new.push_back(poly_new);
     }
 
@@ -159,21 +175,7 @@ void clean_up_polygon_soup(
     size_t num_points_after;
     size_t num_polygons_after;
 
-    if (tolerance > 0) {
-        merge_close_vertices(points, polygons, tolerance);
-
-        if (verbose) {
-            num_points_after = points.size();
-            num_polygons_after = polygons.size();
-
-            std::cout << "Merged: vertices (" << num_points_before << "->" << num_points_after << ") " <<
-                      "faces (" << num_polygons_before << "->" << num_polygons_after << ") with tol=" <<
-                      tolerance << "..." << std::endl;
-
-            num_points_before = num_points_after;
-            num_polygons_before = num_polygons_after;
-        }
-    }
+    merge_close_vertices(points, polygons, tolerance);
 
     PMP::repair_polygon_soup(points, polygons);
     if (reference == nullptr) {
@@ -187,8 +189,9 @@ void clean_up_polygon_soup(
         num_points_after = points.size();
         num_polygons_after = polygons.size();
 
-        std::cout << "Repaired: vertices (" << num_points_before << "->" << num_points_after << ") " <<
-                     "faces (" << num_polygons_before << "->" << num_polygons_after << ")..." << std::endl;
+        std::cout << "Mesh repair: vertices (" << num_points_before << "->" << num_points_after << ") " <<
+                     "faces (" << num_polygons_before << "->" << num_polygons_after << ") with tolerance=" << tolerance <<
+                     "..." << std::endl;
     }
 }
 
@@ -231,6 +234,7 @@ Surface_mesh clean_up_mesh(const Surface_mesh &mesh, const Surface_mesh *referen
 
     Surface_mesh mesh_out;
     PMP::polygon_soup_to_polygon_mesh(points, polygons, mesh_out);
+    PMP::remove_isolated_vertices(mesh_out);
 
     return mesh_out;
 }
