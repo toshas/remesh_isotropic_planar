@@ -61,3 +61,13 @@ Copyright (c) 2023, Anton Obukhov.
 
 The code is provided under GPL-3.0-or-later, refer to [LICENSE](LICENSE) for complete terms.
 
+Please support our research by citing our paper:
+```
+@inproceedings{wang2023breathing,
+    title={Breathing New Life into 3D Assets with Generative Repainting},
+    author={Wang, Tianfu and Kanakis, Menelaos and Schindler, Konrad and Van Gool, Luc and Obukhov, Anton},
+    booktitle={Proceedings of the British Machine Vision Conference (BMVC)},
+    year={2023},
+    publisher={BMVA Press}
+}
+```
